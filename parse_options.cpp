@@ -47,14 +47,14 @@ void parse_options (int argc, char* argv[], OPTIONS& ls_args) {
         exit(EXIT_SUCCESS);
     }
 
-    (vm.count("reversed") != 0) ? ls_args.reversed_order = true : ls_args.default_sort = true;
+    if (vm.count("reversed") != 0) { ls_args.reversed_order = true; };
     if (vm.count("classify")) { ls_args.file_classify = true; }
     if (vm.count("recursive")) { ls_args.is_recursion = true; }
     if (vm.count("is_detailed_info")) {ls_args.is_detailed_info = true; }
 
     for (auto& elem : vm["sort"].as<std::vector<std::string >>()) {
         for (auto& c : elem) {
-            if (c == 'U' || c == 't' || c == 'X' || c == 'N') { ls_args.sort_by = c; }
+            if (c == 'U' || c == 't' || c == 'X' || c == 'N' || c== 'S') { ls_args.sort_by = c; }
             if (c == 'D') { ls_args.dir_first = true; }
             if (c == 's') { ls_args.sp_files_first = true; }
         }

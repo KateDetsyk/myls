@@ -9,15 +9,13 @@
 
 
 struct OPTIONS{
-    bool default_sort = false;
     bool is_recursion = false;
     bool reversed_order = false;
     bool is_detailed_info = false;
     bool file_classify = false;
     bool dir_first = false;
     bool sp_files_first = false;
-    std::string sort_by;
-    std::vector<std::string> sort{};
+    std::string sort_by = "N";
     std::vector<const char *> files{};
 };
 
