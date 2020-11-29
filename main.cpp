@@ -10,7 +10,7 @@
 #include "structs.h"
 
 OPTIONS ls_args{}; // global because we need it in func get_info()
-
+int STATUS = 0;
 std::map<std::string, std::vector<MyStats>> ALL_FILES;
 
 
@@ -68,38 +68,51 @@ static int get_info(const char *fpath, const struct stat *st, int tflag, struct 
 
     if (ftwbuf->level > 1 && !ls_args.is_recursion) { return FTW_SKIP_SUBTREE; } //skip subdirectories if no recursion
 
-    if (tflag == FTW_DNR) { std::cerr << "myls: No permission to read " << fpath << std::endl; }
+    if (tflag == FTW_DNR) {
+        std::cerr << "myls: No permission to read " << fpath << std::endl;
+        STATUS = -1;
+    }
+
     std::string path {fpath};
     if (tflag == FTW_F || ftwbuf->level > 0) {
-        std::string dirname = path.substr(0, path.find_last_of(basename(fpath)) - strlen(basename(fpath))); ////////
         std::string filename = basename(fpath);
+        std::string dir_path = path.substr(0, path.size() - filename.size() - 1);
         MyStats entry = MyStats(filename, *st);
-        ALL_FILES[dirname].push_back(entry);
+        ALL_FILES[dir_path].push_back(entry);
     }
     return 0;
 }
 
-//ToDo: mask
-//ToDo: other sorting
-//ToDo: info for file not folder +++
 
 int main(int argc, char* argv[]) {
     //parse options && fill options structure
     parse_options(argc, argv, ls_args);
 
+    int flags = FTW_MOUNT | FTW_PHYS | FTW_DEPTH | FTW_ACTIONRETVAL;
     // print all for the first target than for the second and so on.
     for (auto& file : ls_args.files) {
         // nopenfd = 1 (3rd argument) specifies the maximum number of directories that nftw() will hold open simultaneously.
-        if (nftw(file, get_info, 1, FTW_MOUNT | FTW_PHYS | FTW_DEPTH | FTW_ACTIONRETVAL) == -1) {
+        if (nftw(const_cast<char *>(file.c_str()), get_info, 1, flags) == -1) {
             std::cerr << "myls: Incorrect argument. No such file or directory " << file << std::endl;
+            STATUS = -1;
         } else {
             for (auto &dir : ALL_FILES) {
                 // sort files
-//                sort(dir.second.begin(), dir.second.end(), comparator);
-                sort(dir.second.begin(), dir.second.end(), _comparators[ls_args.sort_by]);
+                //std::sort(v.begin(),v.end(),std::bind(ltMod,std::placeholders::_1,std::placeholders::_2,iMod));
+                sort(dir.second.begin(), dir.second.end(), std::bind(_comparators[ls_args.sort_by],
+                                                                     std::placeholders::_1, std::placeholders::_2,
+                                                                     ls_args.reversed_order));
                 //ToDo: check if sort special files first * @ = ?
-                if (ls_args.sp_files_first) { sort(dir.second.begin(), dir.second.end(), special_files_sort); }
-                if (ls_args.dir_first) { sort(dir.second.begin(), dir.second.end(), dir_sort); }
+                if (ls_args.sp_files_first) {
+                    sort(dir.second.begin(), dir.second.end(), std::bind(special_files_sort,
+                                                                         std::placeholders::_1, std::placeholders::_2,
+                                                                         ls_args.reversed_order));
+                }
+                if (ls_args.dir_first) {
+                    sort(dir.second.begin(), dir.second.end(), std::bind(dir_sort,
+                                                                         std::placeholders::_1, std::placeholders::_2,
+                                                                         ls_args.reversed_order));
+                }
 
                 // we print "pasth/to/dir: " if we call ls for few files or if we have recursion
                 if ((ls_args.files.size() > 1) || (ls_args.is_recursion)) {
@@ -113,10 +126,11 @@ int main(int argc, char* argv[]) {
                 for (auto &entry : dir.second) {
                     print_file(entry);
                 }
-                std::cout << std::endl;
+
+                (ls_args.is_detailed_info) ? std::cout << std::endl : std::cout << std::endl << std::endl;
             }
         }
         ALL_FILES.clear(); //clean vector for the next target
     }
-    return 0;
+    return STATUS;
 }

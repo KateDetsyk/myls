@@ -1,6 +1,35 @@
 #include "parse_options.h"
 
 
+bool check_if_wildcard(const std::string& str) {
+    bool star = false;
+    bool bracket = false;
+    for (auto& c : str) {
+        if (c == '?') { return true; }
+        else if (c == '*') { star = true; }
+        else if (star && (c != '/')) { return true; }
+        else if (c == '[') { bracket = true; }
+        else if (c == ']' && bracket) { return true; }
+    }
+    return false;
+}
+
+void find_wildcards_matches(const std::string& file, std::vector<std::string>& args) {
+    glob_t glob_result;
+    memset(&glob_result, 0, sizeof(glob_result));
+
+    int return_value = glob(file.c_str(), GLOB_TILDE, nullptr, &glob_result);
+    if(return_value != 0) {
+        std::cerr << "wildcards: no matches found for " << file << std::endl;
+        globfree(&glob_result);
+    }
+    for(size_t j = 0; j < glob_result.gl_pathc; ++j) {
+        args.emplace_back(glob_result.gl_pathv[j]);
+    }
+    globfree(&glob_result);
+}
+
+
 void parse_options (int argc, char* argv[], OPTIONS& ls_args) {
     namespace po = boost::program_options;
     po::options_description visible("Supported options");
@@ -15,8 +44,8 @@ void parse_options (int argc, char* argv[], OPTIONS& ls_args) {
                            "| -- named chanel,\n"
                            "= -- socket,\n"
                            "? -- other.")
-            ("sort", boost::program_options::value<std::vector<std::string >>()->composing()->default_value(
-                    std::vector<std::string>{"N"}, "N"), "Define sorting :\n"
+            ("sort", boost::program_options::value<std::string >()->composing()->default_value(
+                    std::string {"N"}, "N"), "Define sorting :\n"
                          "U – [Unsorted], \n"
                          "S – sort by [Size], from smaller to bigger,\n"
                          "t – sort by modification [time], newest down, reversed to ls --sort=t.\n"
@@ -52,14 +81,19 @@ void parse_options (int argc, char* argv[], OPTIONS& ls_args) {
     if (vm.count("recursive")) { ls_args.is_recursion = true; }
     if (vm.count("is_detailed_info")) {ls_args.is_detailed_info = true; }
 
-    for (auto& elem : vm["sort"].as<std::vector<std::string >>()) {
-        for (auto& c : elem) {
-            if (c == 'U' || c == 't' || c == 'X' || c == 'N' || c== 'S') { ls_args.sort_by = c; }
-            if (c == 'D') { ls_args.dir_first = true; }
-            if (c == 's') { ls_args.sp_files_first = true; }
-        }
+    for (auto& c : vm["sort"].as<std::string>()) {
+        if (c == 'U' || c == 't' || c == 'X' || c == 'N' || c== 'S') { ls_args.sort_by = c; }
+        if (c == 'D') { ls_args.dir_first = true; }
+        if (c == 's') { ls_args.sp_files_first = true; }
     }
+
     for (auto& file : vm["files"].as<std::vector<std::string >>()){
-        ls_args.files.push_back(const_cast<char *>(file.c_str()));
+        if (check_if_wildcard(file)) {
+            find_wildcards_matches(file, ls_args.files);
+        } else if (boost::starts_with(file, "\"") && boost::ends_with(file, "\"")) {
+            ls_args.files.push_back(file.substr(1, file.size()-2));
+        } else {
+            ls_args.files.push_back(file);
+        }
     }
 }
