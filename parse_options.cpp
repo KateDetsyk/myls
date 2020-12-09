@@ -66,8 +66,7 @@ void parse_options (int argc, char* argv[], OPTIONS& ls_args) {
     po::positional_options_description positional;
     positional.add("files", -1);
     po::variables_map vm;
-    auto parsed = po::command_line_parser(argc, argv).options(all).positional(positional).run();
-    po::store(parsed, vm);
+    po::store(po::command_line_parser(argc, argv).options(all).positional(positional).run(), vm);
 
     if (vm.count("help")) {
         std::cout << "Usage example :\n" <<
