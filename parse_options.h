@@ -8,7 +8,8 @@
 #include <glob.h>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string/predicate.hpp>
-
+#include <boost/filesystem.hpp>
+#include <regex>
 
 struct OPTIONS{
     bool is_recursion = false;
@@ -21,6 +22,6 @@ struct OPTIONS{
     std::vector<std::string> files{};
 };
 
-void parse_options (int argc, char* argv[], OPTIONS& ls_args);
+int parse_options (int argc, char* argv[], OPTIONS& ls_args);
 
 #endif //MYLS_PARSE_OPTIONS_H

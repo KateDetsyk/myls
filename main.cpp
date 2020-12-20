@@ -9,6 +9,7 @@
 #include "comparators.h"
 #include "structs.h"
 
+
 OPTIONS ls_args{}; // global because we need it in func get_info()
 int STATUS = 0;
 std::map<std::string, std::vector<MyStats>> ALL_FILES;
@@ -66,6 +67,8 @@ static int get_info(const char *fpath, const struct stat *st, int tflag, struct 
     // The typeflag argument (3rd) passed to fn() is an integer that has one of
     // the following values: FTW_F  fpath is a regular file. FTW_D  fpath is a directory.....
 
+    //if few targets and no reqursion
+//    if (ls_args.files.size() > 1 && ftwbuf->level != 0 && !ls_args.is_recursion) { return FTW_SKIP_SUBTREE; }
     if (ftwbuf->level > 1 && !ls_args.is_recursion) { return FTW_SKIP_SUBTREE; } //skip subdirectories if no recursion
 
     if (tflag == FTW_DNR) {
@@ -74,6 +77,27 @@ static int get_info(const char *fpath, const struct stat *st, int tflag, struct 
     }
 
     std::string path {fpath};
+//    if ((ftwbuf->level == 0 && tflag == FTW_F) ||
+//       (ls_args.files.size() > 1 && ftwbuf->level == 0 && !ls_args.is_recursion)) {
+//        std::string filename = basename(fpath);
+//        MyStats entry = MyStats(filename, *st);
+//        ALL_FILES[filename].push_back(entry);
+//    } else if (tflag == FTW_F || ftwbuf->level > 0) {
+//        std::string filename = basename(fpath);
+//        std::string dir_path = path.substr(0, path.size() - filename.size() - 1);
+//        MyStats entry = MyStats(filename, *st);
+//        ALL_FILES[dir_path].push_back(entry);
+//    }
+
+//    if ( ftwbuf->level == 0 && ls_args.is_mask) {
+//        std::string filename = basename(fpath);
+//        MyStats entry = MyStats(filename, *st);
+//        ALL_FILES[filename].push_back(entry);
+//    } else
+
+//    if (ftwbuf->level == 0 && ls_args.is_mask && tflag == FTW_F ) {
+//        return 0;
+//    }
     if (tflag == FTW_F || ftwbuf->level > 0) {
         std::string filename = basename(fpath);
         std::string dir_path = path.substr(0, path.size() - filename.size() - 1);
@@ -86,7 +110,7 @@ static int get_info(const char *fpath, const struct stat *st, int tflag, struct 
 
 int main(int argc, char* argv[]) {
     //parse options && fill options structure
-    parse_options(argc, argv, ls_args);
+    STATUS = parse_options(argc, argv, ls_args);
 
     int flags = FTW_MOUNT | FTW_PHYS | FTW_DEPTH | FTW_ACTIONRETVAL;
     // print all for the first target than for the second and so on.
@@ -100,18 +124,14 @@ int main(int argc, char* argv[]) {
                 // sort files
                 //std::sort(v.begin(),v.end(),std::bind(ltMod,std::placeholders::_1,std::placeholders::_2,iMod));
                 sort(dir.second.begin(), dir.second.end(), std::bind(_comparators[ls_args.sort_by],
-                                                                     std::placeholders::_1, std::placeholders::_2,
-                                                                     ls_args.reversed_order));
-                //ToDo: check if sort special files first * @ = ?
+                     std::placeholders::_1, std::placeholders::_2, ls_args.reversed_order));
                 if (ls_args.sp_files_first) {
                     sort(dir.second.begin(), dir.second.end(), std::bind(special_files_sort,
-                                                                         std::placeholders::_1, std::placeholders::_2,
-                                                                         ls_args.reversed_order));
+                         std::placeholders::_1, std::placeholders::_2, ls_args.reversed_order));
                 }
                 if (ls_args.dir_first) {
                     sort(dir.second.begin(), dir.second.end(), std::bind(dir_sort,
-                                                                         std::placeholders::_1, std::placeholders::_2,
-                                                                         ls_args.reversed_order));
+                         std::placeholders::_1, std::placeholders::_2, ls_args.reversed_order));
                 }
 
                 // we print "pasth/to/dir: " if we call ls for few files or if we have recursion

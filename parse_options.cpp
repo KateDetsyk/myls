@@ -30,7 +30,7 @@ void find_wildcards_matches(const std::string& file, std::vector<std::string>& a
 }
 
 
-void parse_options (int argc, char* argv[], OPTIONS& ls_args) {
+int parse_options (int argc, char* argv[], OPTIONS& ls_args) {
     namespace po = boost::program_options;
     po::options_description visible("Supported options");
     visible.add_options()
@@ -53,13 +53,13 @@ void parse_options (int argc, char* argv[], OPTIONS& ls_args) {
                          "N – sort by name (default) [Name]. \n"
                          "With anyone from them can be one or two of the two following modifiers :\n"
                          "D -- [Directories_first],\n"
-                         "s -- special files separate [special_file], first. If D -- after dirs.");
+                         "s -- special files separate [special_file], first. If D -- after dirs.")
+            ("mask", boost::program_options::value<std::string >()->composing(),
+                    "search files that suits given mask.\n");
 
     po::options_description invisible("invisible opptions.");
-    invisible.add_options()
-            ("files",
-             po::value<std::vector<std::string>>()->default_value(std::vector<std::string>{"."}, "."),
-             "files for myls.");
+
+    invisible.add_options() ("files", po::value<std::vector<std::string>>(),"files for myls.");
 
     po::options_description all("All options");
     all.add(visible).add(invisible);
@@ -86,13 +86,36 @@ void parse_options (int argc, char* argv[], OPTIONS& ls_args) {
         if (c == 's') { ls_args.sp_files_first = true; }
     }
 
-    for (auto& file : vm["files"].as<std::vector<std::string >>()){
-        if (check_if_wildcard(file)) {
-            find_wildcards_matches(file, ls_args.files);
-        } else if (boost::starts_with(file, "\"") && boost::ends_with(file, "\"")) {
-            ls_args.files.push_back(file.substr(1, file.size()-2));
-        } else {
-            ls_args.files.push_back(file);
+    bool is_wild_card = false;
+    if (vm.count("files")) {
+        for (auto &file : vm["files"].as<std::vector<std::string >>()) {
+            if (check_if_wildcard(file)) {
+                find_wildcards_matches(file, ls_args.files);
+                is_wild_card = true;
+            } else if (boost::starts_with(file, "\"") && boost::ends_with(file, "\"")) {
+                ls_args.files.push_back(file.substr(1, file.size() - 2));
+            } else {
+                ls_args.files.push_back(file);
+            }
         }
     }
+
+    if (vm.count("mask")) {
+        try {
+            std::regex re(vm["mask"].as<std::string>());
+            for (boost::filesystem::directory_iterator itr("."); itr!=boost::filesystem::directory_iterator(); ++itr) {
+                std::cmatch what;
+                const char * f_name = itr->path().filename().c_str();
+                if (!std::regex_match (f_name, re)) { continue; }
+                ls_args.files.emplace_back(itr->path().filename().string());
+            }
+        } catch (const std::regex_error& e) {
+            // error if user give incorrect regex
+            std::cerr << "myls: bad regex, regex_error caught : " << e.what() << std::endl;
+            if (ls_args.files.empty()) { exit(EXIT_FAILURE); }
+            return -1;
+        }
+    }
+    if (ls_args.files.empty() && !is_wild_card) { ls_args.files.emplace_back("."); }
+    return 0;
 }
